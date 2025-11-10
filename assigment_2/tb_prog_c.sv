@@ -202,37 +202,66 @@ program tb_prog_c (
     cg_op.sample();
   endtask
 
-  // --- **NEW**: Helper task to load a register with a specific value
-  // Note: This assumes reg[0] is 0 (which it is at reset)
-  // It uses `LOAD rd, [r0 + addr]`
+  // =================================================================
+  // *** CRITICAL FIX: Improved load_reg_via_mem with better timing
+  // =================================================================
   task automatic load_reg_via_mem(int reg_idx, logic [7:0] val, logic [7:0] addr);
     bit [15:0] load_instr;
+    int timeout;
 
     // 1. Set the memory value at the address we will read from
-    mem[addr] = val;
+    mem[addr]  = val;
 
-    // 2. Create the LOAD instruction: opc=9, rd=reg_idx, rs=0, imm=addr
-    //    We can use our class for this!
-    if (!inst_item.randomize() with {
-          opc == 4'h9;  // LOAD
-          rd == reg_idx;
-          rs == 0;  // Use reg[0] as base
-          imm4 == addr;  // This is a 4-bit immediate, so we must use a low addr
-                         // Let's modify this to use addr[3:0]
-        }) begin
-      $error("Failed to randomize LOAD helper");
-      $finish;
-    end
-    load_instr = inst_item.get_instr();
+    // 2. Build LOAD instruction manually (don't use randomize in helper)
+    //    Format: LOAD rd, [rs + imm]
+    //    We want: LOAD reg_idx, [r0 + addr[3:0]]
+    load_instr = {4'h9, reg_idx[2:0], 1'b0, 3'b000, 1'b0, addr[3:0]};
 
-    // 3. Drive the instruction
-    $display("[%0t] Helper: Loading r%0d with %0d (from mem[%0h])", $time, reg_idx, val, addr);
-    drive_instr(load_instr);
+    // 3. Drive the instruction and wait for completion
+    $display("[%0t] Helper: Loading r%0d with 0x%h (from mem[0x%h])", $time, reg_idx, val, addr);
 
-    // 4. Wait for the instruction to complete (IDLE->DEC->EXEC->MEM->WB)
-    //    This is critical. We must wait for the writeback.
-    repeat (5) @(tb_h.cb);
-    cg_fl.sample();  // Sample flags after it has time to write back
+    // Wait for CPU ready
+    timeout = 0;
+    do begin
+      @(tb_h.cb);
+      timeout++;
+      if (timeout > 100) begin
+        $error("[%0t] TIMEOUT waiting for instr_ready in load_reg_via_mem", $time);
+        $finish;
+      end
+    end while (!tb_h.cb.instr_ready);
+
+    // Drive instruction
+    tb_h.cb.instr <= load_instr;
+    tb_h.cb.instr_valid <= 1'b1;
+    @(tb_h.cb);
+    tb_h.cb.instr_valid <= 1'b0;
+
+    // Sample opcode coverage
+    cg_op.sample();
+
+    // 4. Wait for the LOAD to complete
+    //    LOAD sequence: IDLE->DECODE->EXEC->MEM->IDLE
+    //    We need to wait for the CPU to return to IDLE (instr_ready=1)
+    timeout = 0;
+    do begin
+      @(tb_h.cb);
+      timeout++;
+      if (timeout > 100) begin
+        $error("[%0t] TIMEOUT waiting for LOAD completion in load_reg_via_mem", $time);
+        $display("[%0t]   mem_req=%b, mem_ready=%b, mem_addr=0x%h", $time, tb_h.cb.mem_req,
+                 tb_h.cb.mem_ready, tb_h.cb.mem_addr);
+        $finish;
+      end
+    end while (!tb_h.cb.instr_ready);
+
+    // Give one more cycle for register write to settle
+    @(tb_h.cb);
+
+    // Sample flags
+    cg_fl.sample();
+
+    $display("[%0t] Helper: Load complete, r%0d should now be 0x%h", $time, reg_idx, val);
   endtask
 
 
@@ -311,7 +340,11 @@ program tb_prog_c (
     test_instr = inst_item.get_instr();
     $display("[%0t]   Instruction: MEM[r0 + 5] = r4 (storing 0xAB to mem[5])", $time);
     drive_instr(test_instr);
-    repeat (6) @(tb_h.cb);  // Extra cycle for memory operation
+
+    // Wait for STORE to complete (need to wait for IDLE state)
+    do @(tb_h.cb); while (!tb_h.cb.instr_ready);
+    @(tb_h.cb);
+
     cg_fl.sample();
 
     // Verify store worked
@@ -350,6 +383,9 @@ program tb_prog_c (
     // **NEW**: Construct the instruction item
     inst_item = new();
 
+    // Wait a few cycles for memory model to initialize
+    repeat (3) @(tb_h.cb);
+
     // -----------------------------------------------------------------
     // 0. DIRECTED TEST FOR MISSING OPCODES (RUN FIRST!)
     // -----------------------------------------------------------------
@@ -373,8 +409,8 @@ program tb_prog_c (
       // This is now an assignment, not a declaration.
       inst = inst_item.get_instr();
 
-      // Print every 50th instruction to reduce log spam
-      if (i % 50 == 0) begin
+      // Print every 100th instruction to reduce log spam
+      if (i % 100 == 0) begin
         $display("[%0t] Progress: %0d/%0d instructions (opcode: 0x%h)", $time, i, num_instructions,
                  inst_item.opc);
       end
