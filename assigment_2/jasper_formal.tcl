@@ -5,7 +5,7 @@ clear -all
 
 # Load files
 analyze -sv09 tb_if.sv
-analyze -verilog simple_cpu.sv
+analyze -sv09 simple_cpu.sv
 analyze -sv09 sva_assertions.sv
 
 # Elaborate
