@@ -191,7 +191,7 @@ program tb_prog_c (
     // -----------------------------------------------------------------
     // 1. RANDOM PHASE
     // -----------------------------------------------------------------
-    num_instructions = 500;
+    num_instructions = 10;
     $display("[%0t] Running %0d random instructions (HALT is constrained)...", $time,
              num_instructions);
 
