@@ -22,7 +22,7 @@ program tb_prog_c (
   // Coverage groups
   // ---------------------------------------------------------------------
   // Opcode coverpoint (explicit bins so missing ops are visible)
-  covergroup cg_opcode @(tb_h.cb);
+  covergroup cg_opcode;
     cp_opcode: coverpoint tb_h.instr[15:12] {
       bins nop = {4'h0};
       bins add = {4'h1};
