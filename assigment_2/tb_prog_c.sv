@@ -144,6 +144,7 @@ program tb_prog_c (
 
     for (int i = 0; i < num_instructions; i++) begin
 
+      $display("%d valus", i);
       // Randomize the class object
       if (!inst_item.randomize()) begin
         $error("Randomization failed!");
