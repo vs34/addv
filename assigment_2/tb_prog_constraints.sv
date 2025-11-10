@@ -13,6 +13,9 @@ program tb_prog_c (
   int instr_count;
   int seed;
 
+  // Declare generator handle at program scope for simulator compatibility
+  instr_gen_c gen;
+
   // ---------------------------------------------------------------------
   // Covergroup
   // ---------------------------------------------------------------------
@@ -82,7 +85,8 @@ program tb_prog_c (
     seed = 42;
     instr_count = 0;
 
-    instr_gen_c gen = new();
+    // instantiate generator (assignment inside procedural block for compatibility)
+    gen = new();
 
     for (int i = 0; i < num_instructions; i++) begin
       if (!gen.randomize()) begin
