@@ -35,6 +35,6 @@ module TOP;  // note: your earlier command used -top TOP
   );
 
   // instantiate the program and connect interface to its port
-  // tb_prog tb_prog_inst (tb_if_i);
-  tb_prog_c tb_prog_inst (tb_if_i);
+  tb_prog tb_prog_inst (tb_if_i);
+  // tb_prog_c tb_prog_inst (tb_if_i);
 endmodule
