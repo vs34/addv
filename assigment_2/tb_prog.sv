@@ -145,4 +145,10 @@ program tb_prog (
     run_tests();
   endtask
 
+  // program auto-start: call start() from program context
+  initial begin
+    // small settle time (optional)
+    @(tb_h.cb);
+    start();
+  end
 endprogram

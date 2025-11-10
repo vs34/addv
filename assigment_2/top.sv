@@ -36,11 +36,4 @@ module TOP;  // note: your earlier command used -top TOP
 
   // instantiate the program and connect interface to its port
   tb_prog tb_prog_inst (tb_if_i);
-
-  // start the test by calling program task
-  initial begin
-    // give program a small delay to initialize
-    #1;
-    tb_prog_inst.start();
-  end
 endmodule
