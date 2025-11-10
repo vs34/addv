@@ -220,19 +220,30 @@ program tb_prog_c (
              num_instructions);
 
     for (int i = 0; i < num_instructions; i++) begin
-      // **NEW**: Randomize the class object
+
+      // Randomize the class object
       if (!inst_item.randomize()) begin
         $error("Randomization failed!");
         $finish;
       end
 
-      // **NEW**: Get the 16-bit instruction from the class
+      // This is now an assignment, not a declaration.
       inst = inst_item.get_instr();
 
-      // **NEW**: Use helper task to drive
-      drive_instr(inst);
+      // **ADD THIS LINE TO PRINT THE INSTRUCTION**
+      $display("[%0t] Driving instr #%0d: 0x%h (opcode: 0x%h)", $time, i, inst, inst_item.opc);
 
-      // sample coverage (flags)
+      // wait until CPU is ready to accept an instruction
+      do @(tb_h.cb); while (!tb_h.cb.instr_ready);
+
+      // drive instruction and valid for one clock
+      tb_h.cb.instr <= inst;  // Use the local 'inst' variable
+      tb_h.cb.instr_valid <= 1'b1;
+      @(tb_h.cb);
+      tb_h.cb.instr_valid <= 1'b0;
+
+      // sample coverage
+      cg_op.sample();
       cg_fl.sample();
     end
 
